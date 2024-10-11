@@ -1,0 +1,53 @@
+# our local base image
+FROM ubuntu:20.04
+
+LABEL description="Container for use with PyMembrane" 
+
+# install build dependencies 
+ARG DEBIAN_FRONTEND=noninteractive
+RUN export TZ='Europe/Warsaw'
+RUN apt-get update && apt-get install -y g++ rsync zip openssh-server make build-essential cmake wget curl
+RUN apt-get install -y nodejs
+RUN rm -rf /var/lib/apt/lists/*
+
+#create a new user so is not root
+#RUN useradd -u 8877 LeafyLeaf
+
+#RUN mkdir LeafyLeaf
+
+#RUN chown LeafyLeaf: LeafyLeaf
+
+ENV PATH="/root/miniconda3/bin:${PATH}"
+ARG PATH="/root/miniconda3/bin:${PATH}"
+
+#RUN cd LeafyLeaf && ls
+
+#RUN ls
+
+RUN wget \
+    https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
+    && mkdir /root/.conda \
+    && bash Miniconda3-latest-Linux-x86_64.sh -b \
+    && rm -f Miniconda3-latest-Linux-x86_64.sh 
+RUN conda --version
+RUN conda install python=3.7 
+RUN conda install numpy scipy matplotlib jupyter jupyterlab vtk pip
+RUN conda install -c conda-forge ipympl
+#RUN conda install -c conda-forge nodejs 
+RUN  conda install nodejs -c conda-forge --repodata-fn=repodata.json
+RUN jupyter labextension install @jupyter-widgets/jupyterlab-manager jupyter-matplotlib
+
+# Change to non-root privilege
+#USER LeafyLeaf
+
+RUN mkdir pymembrane
+WORKDIR pymembrane/
+
+# Add Tini. Tini operates as a process subreaper for jupyter. This prevents kernel crashes.
+#https://github.com/krallin/tini
+ENV TINI_VERSION v0.6.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /usr/bin/tini
+RUN chmod +x /usr/bin/tini
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+CMD ["jupyter", "lab", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root"]
